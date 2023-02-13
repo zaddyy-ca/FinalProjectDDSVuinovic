@@ -1,0 +1,111 @@
+---
+title: "Adam_Vuinovic_Final_Project_DDS"
+output: html_document
+date: "2023-02-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{retrieve AWS files}
+library(aws.signature)
+library(aws.s3)
+library(httr)
+
+configure_aws_s3( access_key = "AKIAYMASBP7GDO6TC4SF",
+                  secret_key = "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"
+                  )
+Sys.setenv("AWS_ACCESS_KEY_ID" = "AKIAYMASBP7GDO6TC4SF", 
+           "AWS_SECRET_ACCESS_KEY" = "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",
+           "AWS_DEFAULT_REGION" = "us-east-2")
+
+
+url <- "https://s3.amazonaws.com/smuddsproject2/CaseStudy2-data.csv"
+
+response <- GET(url)
+
+if (status_code(response) == 200) {
+  content <- content(response, as = "text")
+  print(content)
+} else {
+  stop("Failed to retrieve file")
+}
+
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+
+train_index <- sample(1:nrow(data), 0.7*nrow(data))
+train_data <- data[train_index, ]
+test_data <- data[-train_index, ]
+
+
+
+```
+
+```{r pressure, echo=FALSE}
+
+
+model <- lm(y ~ x, data = train_data)
+
+summary(model)
+
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+
+plot(x, y, main = "Linear Regression Model")
+abline(model, col = "red")
+
+
+
+```
+
+
+
+
+
+```{r pressure, echo=FALSE}
+
+
+
+
+
+```
+
+
+
+
+```{r pressure, echo=FALSE}
+
+
+
+
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+
+
+
+
+```

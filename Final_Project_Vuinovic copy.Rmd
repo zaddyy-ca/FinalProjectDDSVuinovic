@@ -1,0 +1,168 @@
+---
+title: "Adam_Vuinovic_Final_Project_DDS"
+output: html_document
+date: "2023-02-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Read in data and R libraries
+```{r pressure, echo=FALSE}
+# read in csv's and libraries
+
+fullData = read.csv(file.choose(), sep = ",", header = T, quote = "")
+dataNoAttrition = read.csv(file.choose(), sep = ",", header = T, quote = "")
+dataNoSalary = read.csv(file.choose(), sep = ",", header = T, quote = "")
+
+
+library(tidyr)
+library(plyr)
+library(jsonlite)
+library(dplyr)
+library(tidyverse)
+library(class)
+library(ggplot2)
+library(caret)
+library(e1071)
+```
+
+Exploratory data to understand composition of datasets
+```{r pressure, echo=FALSE}
+
+colSums(is.na(fullData)) #no null values
+
+hist(fullData$Age)
+hist(fullData$YearsAtCompany)
+scatter.smooth(fullData$DistanceFromHome, 
+               xlab = 'EmployeeID',
+               ylab = 'Distance from Home [mi]')
+
+#check unique values of standardHours
+unique_values_stanHrs<- unique(fullData$StandardHours)
+
+# print the result
+print(unique_values_stanHrs)
+#all the same value, we'll drop
+
+
+#check unique values of overtime
+unique_values_ot<- unique(fullData$OverTime)
+
+# print the result
+print(unique_values_ot)
+
+```
+
+Prep Data
+```{r pressure, echo=FALSE}
+
+#Filter out columns that won't be used to prevent overfitting model
+preppedData = fullData %>% select(-YearsInCurrentRole, -Over18, -OverTime, -StandardHours, 
+                                     -MonthlyRate, -DailyRate, -HourlyRate, -EducationField, -ID,
+                                     -EmployeeNumber, -EmployeeCount, -TotalWorkingYears, -JobRole,
+                                  -YearsWithCurrManager, -NumCompaniesWorked, -Education, -DistanceFromHome, -YearsSinceLastPromotion, 
+                                  -TrainingTimesLastYear, -YearsAtCompany)
+
+#preppedData$MonthlyIncome = ifelse(preppedData$MonthlyIncome <= 5500, "Low", 
+                                           #ifelse(preppedData$MonthlyIncome <= 13000, "Medium", "High"))
+
+#preppedData$DistanceFromHomeGroup = ifelse(preppedData$DistanceFromHome <= 5, "Near", 
+                                              # ifelse(preppedData$DistanceFromHome <= 15, "Medium", "Far"))
+
+```
+
+
+Normalize ranges, One Hot Encode Categorical Variables, and convert back to data frame
+```{r pressure, echo=FALSE}
+# Convert to matrix to one hot encode categorical variables
+design_matrix = model.matrix(preppedData$Attrition ~ ., data = preppedData)
+
+# Normalize the data
+design_matrix_normalized <- scale(design_matrix)
+
+# Convert the design matrix to a data frame
+design_data <- data.frame(design_matrix, Attrition = preppedData$Attrition)
+
+
+```
+
+
+Create Test and Training Sets
+```{r pressure, echo=FALSE}
+
+
+# Split the data into training and test sets
+set.seed(310)
+train_index <- createDataPartition(design_data$Attrition, p = 0.6, list = FALSE)
+training_data <- design_data[train_index, ]
+test_data <- design_data[-train_index, ]
+
+```
+
+
+```{r pressure, echo=FALSE}
+# Build the Naive Bayes model
+model_nb <- naiveBayes(training_data[, -ncol(training_data)], training_data$Attrition)
+```
+
+```{r pressure, echo=FALSE}
+# Predict the target variable for the test data Naive. Bayes
+predictions_nb <- predict(model_nb, test_data[, -ncol(test_data)])
+
+# Compare the predicted values with the actual values
+table(predictions_nb, test_data$Attrition)
+```
+
+```{r pressure, echo=FALSE}
+# Factor Levels of $Attrition
+test_confusionmatrix = as.factor(test_data$Attrition)
+
+# Full Confusion Matrix Evaluation
+confusionMatrix(predictions_nb, test_confusionmatrix)
+
+```
+
+
+
+
+```{r pressure, echo=FALSE}
+# Build the k-NN model
+model_knn <- knn(train = training_data[, -ncol(training_data)],
+                 class = training_data$Attrition,
+                 test = test_data[, -ncol(test_data)],
+                 k = 5)
+```
+
+
+```{r pressure, echo=FALSE}
+# Predict the target variable for the test data
+predictions_knn <- predict(model_knn, test_data[, -ncol(test_data)])
+
+# Compare the predicted values with the actual values
+table(predictions_knn, test_data$Attrition)
+
+confusionMatrix(predictions_knn, test_data$Attrition)
+
+test_data$Results = predictions_nb
+
+ggplot(test_data, aes(x = YearsAtCompany, fill = Results)) + 
+  geom_bar(position = "dodge") + 
+  scale_fill_manual(values = c("yes" = "green", "no" = "red")) + 
+  ggtitle("College Attendance by Year") + 
+  xlab("Year") + 
+  ylab("Count")
+```
+
+
+test_data$results = predictions_nb
+
+ggplot(test_data, aes(x = DistanceFromHome, fill = results)) + 
+  geom_bar(position = "dodge") + 
+  scale_fill_manual(values = c("green", "red")) + 
+  ggtitle("Distance From Home") + 
+  xlab("Distance") + 
+  ylab("Count")
+  
+  

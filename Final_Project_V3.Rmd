@@ -1,0 +1,241 @@
+---
+title: "Adam_Vuinovic_Final_Project_DDS"
+output: html_document
+date: "2023-02-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r pressure, echo=FALSE}
+# read in csv's and libraries
+
+fullData = read.csv(file.choose(), sep = ",", header = T, quote = "")
+dataNoAttrition = read.csv(file.choose(), sep = ",", header = T, quote = "")
+dataNoSalary = read.csv(file.choose(), sep = ",", header = T, quote = "")
+
+
+library(tidyr)
+library(plyr)
+library(jsonlite)
+library(dplyr)
+library(tidyverse)
+library(class)
+library(ggplot2)
+library(caret)
+library(e1071)
+```
+Exploratory data to understand composition of datasets
+
+```{r pressure, echo=FALSE}
+
+colSums(is.na(fullData)) #no null values
+
+hist(fullData$Age)
+hist(fullData$YearsAtCompany)
+scatter.smooth(fullData$DistanceFromHome, 
+               xlab = 'EmployeeID',
+               ylab = 'Distance from Home [mi]')
+
+#check unique values of standardHours
+unique_values_stanHrs<- unique(fullData$StandardHours)
+
+# print the result
+print(unique_values_stanHrs)
+#all the same value, we'll drop
+
+
+#check unique values of overtime
+unique_values_ot<- unique(fullData$OverTime)
+
+# print the result
+print(unique_values_ot)
+
+```
+
+Prep Data
+```{r pressure, echo=FALSE}
+
+#Filter out columns that won't be used to prevent overfitting model
+preppedData = fullData %>% select(-YearsInCurrentRole, -Over18, -OverTime, -StandardHours, 
+                                     -MonthlyRate, -DailyRate, -HourlyRate, -EducationField, -ID,
+                                     -EmployeeNumber, -EmployeeCount, -TotalWorkingYears, -JobRole,
+                                  -YearsWithCurrManager)
+```
+
+
+Factor Set, One Hot Encode Categorical Variables
+```{r pressure, echo=FALSE}
+# Factor Categorical Variables: 
+
+
+preppedData$Attrition = ifelse(preppedData$Attrition=="Yes",1,0)
+preppedData$Attrition = as.factor(preppedData$Attrition )
+preppedData$BusinessTravel = as.factor(preppedData$BusinessTravel)
+preppedData$Department = as.factor(preppedData$Department)
+preppedData$Gender = as.factor(preppedData$Gender)
+preppedData$MaritalStatus = as.factor(preppedData$MaritalStatus)
+
+
+
+dfFactors = model.matrix(preppedData$Attrition ~ preppedData$BusinessTravel+preppedData$Department+preppedData$Gender+preppedData$MaritalStatus, preppedData)[,-1]
+
+finalData = as.data.frame(data.frame(preppedData$Attrition, dfFactors, preppedData$PercentSalaryHike, preppedData$YearsSinceLastPromotion, preppedData$Age, preppedData$DistanceFromHome, preppedData$MonthlyIncome, preppedData$PercentSalaryHike, preppedData$YearsAtCompany, preppedData$YearsSinceLastPromotion))
+
+# Remove the string unwanted prefix from all column names
+colnames(finalData) <- gsub("^preppedData.", "", colnames(finalData))
+colnames(finalData) <- gsub("^strPreppedData.", "", colnames(finalData))
+colnames(finalData) <- gsub("^reducedColData.", "", colnames(finalData))
+
+# Normalize Final Data
+
+
+```
+
+
+Create Test and Training Sets
+```{r pressure, echo=FALSE}
+
+
+# Split the data into training and test sets
+set.seed(320)
+train_index <- createDataPartition(finalData$Attrition, p = 0.8, list = FALSE)
+training_data <- finalData[train_index, ]
+test_data <- finalData[-train_index, ]
+
+# Check for missing values
+sum(is.na(training_data))
+sum(is.na(test_data))
+
+
+```
+
+Run Naive Bayes
+```{r pressure, echo=FALSE}
+
+# Train a Gaussian Naive Bayes model
+model <- naiveBayes(Attrition ~ ., data = training_data)
+```
+
+
+```{r pressure, echo=FALSE}
+# Evaluate the model on the test set
+
+predictions <- predict(model, test_data,)
+table(predictions, test_data$Attrition)
+```
+
+
+```{r pressure, echo=FALSE}
+# Calculate evaluation metrics
+confusionMatrix(predictions, test_data$Attrition)
+```
+
+
+Run KNN Model
+
+```{r pressure, echo=FALSE}
+
+```
+
+```{r pressure, echo=FALSE}
+# Train KNN Model
+knnFit <- knn(train = training_data[, 1:57], test = test_data[, 1:57], cl = training_data$Attrition, k = 5)
+```
+
+```{r pressure, echo=FALSE}
+# Evaluate Model Accuracy
+accuracy <- mean(knnFit == test_data$Attrition)
+cat("Accuracy:", accuracy)
+```
+
+```{r pressure, echo=FALSE}
+# Make Predictions With Model
+predictions <- knn(train = training_data[, 1:ncol(training_data)-1], test = test_data[, 1:ncol(test_data)-1], cl = training_data$Attrition, k = 5)
+```
+
+```{r pressure, echo=FALSE}
+# Compare Results with Confusion Matrix
+confusionMatrix(predictions, test_data$Attrition)
+
+
+```
+
+
+
+No Attrition Data
+```{r pressure, echo=FALSE}
+
+noAttritionShort = dataNoAttrition %>% select(-YearsInCurrentRole, -Over18, -OverTime, -StandardHours, -MonthlyRate, -DailyRate, -HourlyRate, -EducationField, -ID, -EmployeeNumber, -EmployeeCount, -TotalWorkingYears, -JobRole, -YearsWithCurrManager)
+
+
+Attrition2 = rep(1, 300)
+noAttritionShort$Attrition = Attrition2
+noAttritionShort$Attrition <- as.factor(noAttritionShort$Attrition)
+noAttritionShort$BusinessTravel = as.factor(noAttritionShort$BusinessTravel)
+noAttritionShort$Department = as.factor(noAttritionShort$Department)
+noAttritionShort$Gender = as.factor(noAttritionShort$Gender)
+noAttritionShort$MaritalStatus = as.factor(noAttritionShort$MaritalStatus)
+noAttritionShort$Education = as.factor(noAttritionShort$Education)
+noAttritionShort$EnvironmentSatisfaction = as.factor(noAttritionShort$EnvironmentSatisfaction)
+noAttritionShort$JobLevel = as.factor(noAttritionShort$JobLevel)
+noAttritionShort$JobInvolvement = as.factor(noAttritionShort$JobInvolvement)
+noAttritionShort$JobSatisfaction = as.factor(noAttritionShort$JobSatisfaction)
+noAttritionShort$NumCompaniesWorked = as.factor(noAttritionShort$NumCompaniesWorked)
+noAttritionShort$PerformanceRating = as.factor(noAttritionShort$PerformanceRating)
+noAttritionShort$RelationshipSatisfaction = as.factor(noAttritionShort$RelationshipSatisfaction)
+noAttritionShort$StockOptionLevel = as.factor(noAttritionShort$StockOptionLevel)
+noAttritionShort$TrainingTimesLastYear = as.factor(noAttritionShort$TrainingTimesLastYear)
+noAttritionShort$WorkLifeBalance = as.factor(noAttritionShort$WorkLifeBalance)
+
+
+dfFactorsPredict = model.matrix(Attrition ~ noAttritionShort$BusinessTravel+noAttritionShort$Department+noAttritionShort$Gender+noAttritionShort$MaritalStatus+noAttritionShort$Education+noAttritionShort$EnvironmentSatisfaction+noAttritionShort$JobInvolvement+noAttritionShort$JobLevel+noAttritionShort$JobSatisfaction+noAttritionShort$NumCompaniesWorked+noAttritionShort$PerformanceRating+noAttritionShort$RelationshipSatisfaction+noAttritionShort$StockOptionLevel+noAttritionShort$TrainingTimesLastYear+noAttritionShort$WorkLifeBalance)[,-1]
+
+finalPredictAttrition = as.data.frame(data.frame(noAttritionShort$Attrition, dfFactorsPredict, noAttritionShort$PercentSalaryHike, noAttritionShort$YearsSinceLastPromotion, noAttritionShort$Age, noAttritionShort$DistanceFromHome, noAttritionShort$MonthlyIncome, noAttritionShort$PercentSalaryHike, noAttritionShort$YearsAtCompany, noAttritionShort$YearsSinceLastPromotion))
+
+# Remove the string unwanted prefix from all column names
+colnames(finalPredictAttrition) <- gsub("^noAttritionShort.", "", colnames(finalPredictAttrition))
+
+```
+
+Run best model against trial data
+```{r pressure, echo=FALSE}
+
+predictions2 <- predict(model, finalPredictAttrition,)
+table(predictions2, finalPredictAttrition$Attrition)
+
+
+```
+
+Test No Attrition
+
+```{r pressure, echo=FALSE}
+
+confusionMatrix(predictions2, finalPredictAttrition$Attrition)
+
+
+```
+
+```{r pressure, echo=FALSE}
+# Evaluate Model Accuracy
+accuracy <- mean(knnFit == finalPredictAttrition$Attrition)
+cat("Accuracy:", accuracy)
+```
+
+```{r pressure, echo=FALSE}
+# Make Predictions With Model
+predictions <- knn(train = training[, 1:ncol(training_data)-1], test = finalPredictAttrition[, 1:ncol(finalPredictAttrition)-1], cl = training_data$Attrition, k = 5)
+```
+
+```{r pressure, echo=FALSE}
+# Compare Results with Confusion Matrix
+confusionMatrix(predictions, finalPredictAttrition$Attrition)
+
+
+```
+
+
+
+
+

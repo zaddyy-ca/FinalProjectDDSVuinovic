@@ -1,0 +1,248 @@
+---
+title: "Adam_Vuinovic_Final_Project_DDS"
+output: html_document
+date: "2023-02-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+
+```{r}
+# read in csv's and libraries
+
+fullData = read.csv(file.choose(), sep = ",", header = T, quote = "")
+dataNoAttrition = read.csv(file.choose(), sep = ",", header = T, quote = "")
+dataNoSalary = read.csv(file.choose(), sep = ",", header = T, quote = "")
+
+
+library(tidyr)
+library(plyr)
+library(jsonlite)
+library(dplyr)
+library(tidyverse)
+library(class)
+library(ggplot2)
+library(caret)
+library(e1071)
+```
+Exploratory data to understand composition of datasets
+
+```{r pressure, echo=FALSE}
+
+colSums(is.na(fullData)) #no null values
+
+hist(fullData$Age)
+hist(fullData$YearsAtCompany)
+scatter.smooth(fullData$DistanceFromHome, 
+               xlab = 'EmployeeID',
+               ylab = 'Distance from Home [mi]')
+
+#check unique values of standardHours
+unique_values_stanHrs<- unique(fullData$StandardHours)
+
+# print the result
+print(unique_values_stanHrs)
+#all the same value, we'll drop
+
+
+#check unique values of overtime
+unique_values_ot<- unique(fullData$OverTime)
+
+# print the result
+print(unique_values_ot)
+
+#Filter out columns that won't be used to prevent overfitting model
+reducedColData = fullData %>% select(-YearsInCurrentRole, -Over18, -OverTime, -StandardHours, 
+                                     -MonthlyRate, -DailyRate, -HourlyRate, -EducationField, -ID,
+                                     -EmployeeNumber, -EmployeeCount, -TotalWorkingYears, -JobRole)
+```
+
+
+
+Breakout Ranges to Prep One Hot Encoding
+```{r pressure, echo=FALSE}
+# Age
+reducedColData$AgeGroup = ifelse(reducedColData$Age <= 21, "EntryLevel", 
+                                 ifelse(reducedColData$Age <= 28, "Novice",
+                                        ifelse(reducedColData$Age <= 35, "Experienced",
+                                               ifelse(reducedColData$Age <= 45, "Advanced","Expert"))))
+
+# Years At Company
+reducedColData$YearsAtCompanyGroup = ifelse(reducedColData$YearsAtCompany <= 5, "NewHire", 
+                                       ifelse(reducedColData$YearsAtCompany <= 10, "Tenured",
+                                       ifelse(reducedColData$YearsAtCompany <= 25, "Leader", "Lifer")))
+
+# Distance From Home
+reducedColData$DistanceFromHomeGroup = ifelse(reducedColData$DistanceFromHome <= 5, "Near", 
+                                              ifelse(reducedColData$DistanceFromHome <= 15, "Medium", "Far"))
+# Monthly Income
+reducedColData$MonthlyIncomeGroup = ifelse(reducedColData$MonthlyIncome <= 5500, "Low", 
+                                           ifelse(reducedColData$MonthlyIncome <= 13000, "Medium", "High"))
+
+# Drop orignal columns for final test dataset
+preppedData = reducedColData %>% select(-Age, -YearsAtCompany, -DistanceFromHome, -MonthlyIncome)
+
+# Normalize Data
+#preppedDataNumeric = preppedData %>% select(-Attrition, -BusinessTravel, -Department, -Gender, -MaritalStatus, -AgeGroup, -YearsAtCompanyGroup, -DistanceFromHomeGroup, -MonthlyIncomeGroup)
+
+
+
+```
+
+Factor Set, One Hot Encode Categorical Variables
+```{r pressure, echo=FALSE}
+# Factor Categorical Variables: Attrition, BusinessTravel, Department, Gender, MaritalStatus, AgeGroup, YearsAtCompanyGroup, DistanceFromHomeGroup, MonthlyIncomeGroup
+
+str(preppedData)
+preppedData$Attrition <- ifelse(preppedData$Attrition=="Yes",1,0)
+preppedData$Attrition = as.factor(preppedData$Attrition )
+preppedData$BusinessTravel = as.factor(preppedData$BusinessTravel)
+preppedData$Department = as.factor(preppedData$Department)
+preppedData$Gender = as.factor(preppedData$Gender)
+preppedData$MaritalStatus = as.factor(preppedData$MaritalStatus)
+preppedData$AgeGroup = as.factor(preppedData$AgeGroup)
+preppedData$YearsAtCompanyGroup = as.factor(preppedData$YearsAtCompanyGroup)
+preppedData$DistanceFromHomeGroup = as.factor(preppedData$DistanceFromHomeGroup)
+preppedData$MonthlyIncomeGroup = as.factor(preppedData$MonthlyIncomeGroup)
+
+dfFactors = model.matrix(preppedData$Attrition ~ preppedData$BusinessTravel+preppedData$Department+preppedData$Gender+preppedData$MaritalStatus+preppedData$AgeGroup+preppedData$YearsAtCompanyGroup+preppedData$DistanceFromHomeGroup+preppedData$MonthlyIncomeGroup)[,-1]
+
+finalData = as.data.frame(data.frame(preppedData$Attrition, dfFactors, preppedData$Education, preppedData$EnvironmentSatisfaction, preppedData$JobInvolvement, preppedData$JobLevel, preppedData$JobSatisfaction, preppedData$NumCompaniesWorked, preppedData$PercentSalaryHike, preppedData$PerformanceRating, preppedData$RelationshipSatisfaction, preppedData$StockOptionLevel, preppedData$TrainingTimesLastYear, preppedData$WorkLifeBalance, preppedData$YearsSinceLastPromotion, preppedData$YearsWithCurrManager))
+
+# Remove the string unwanted prefix from all column names
+colnames(finalData) <- gsub("^preppedData.", "", colnames(finalData))
+colnames(finalData) <- gsub("^strPreppedData.", "", colnames(finalData))
+
+# Normalize Final Data
+# I wont normalize the data because I already grouped extreme ranges to bins.
+
+```
+
+
+Create Test and Training Sets
+```{r pressure, echo=FALSE}
+
+# Split the data into training and test sets
+set.seed(200) 
+index <- sample(1:nrow(finalData), round(nrow(finalData) * 0.7))
+training_data <- finalData[index, ]
+test_data <- finalData[-index, ]
+
+
+```
+
+Run Naive Bayes
+```{r pressure, echo=FALSE}
+
+# Train a Gaussian Naive Bayes model
+model <- naiveBayes(Attrition ~ ., data = training_data)
+```
+
+
+```{r pressure, echo=FALSE}
+# Evaluate the model on the test set
+test_data$Attrition = as.numeric(test_data$Attrition)
+
+predictions <- predict(model, test_data[, -ncol(test_data)])
+table(predictions, test_data$Attrition)
+```
+
+
+```{r pressure, echo=FALSE}
+# Calculate evaluation metrics
+confusionMatrix(predictions, test_data$Attrition)
+```
+
+
+Run KNN Model
+```{r pressure, echo=FALSE}
+# Train KNN Model
+knnFit <- knn(train = training_data [, ncol(training_data)-1], test = test_data[, ncol(test_data)-1], cl = training_data$Attrition, k = 5)
+```
+
+```{r pressure, echo=FALSE}
+# Evaluate Model Accuracy
+accuracy <- mean(knnFit == testing$Species)
+cat("Accuracy:", accuracy)
+```
+
+```{r pressure, echo=FALSE}
+# Make Predictions With Model
+predictions <- knn(train = training[, 1:ncol(training_data)-1], test = testing[, 1:ncol(test_data)-1], cl = training_data$Attrition, k = 5)
+```
+
+```{r pressure, echo=FALSE}
+# Compare Results with Confusion Matrix
+confusionMatrix(predictions, test_data$Attrition)
+
+
+```
+
+Run best model against trial data
+```{r pressure, echo=FALSE}
+# Make predictions on new, unseen data
+new_data <- read.csv("new_data.csv")
+predictions <- predict(model, new_data)
+```
+
+Run Linear Regression
+```{r pressure, echo=FALSE}
+
+
+model <- lm(y ~ x, data = train_data)
+
+summary(model)
+
+
+```
+
+
+
+
+```{r pressure, echo=FALSE}
+
+
+plot(x, y, main = "Linear Regression Model")
+abline(model, col = "red")
+
+
+
+```
+
+
+
+
+
+```{r pressure, echo=FALSE}
+
+
+
+
+
+```
+
+
+
+
+```{r pressure, echo=FALSE}
+
+
+
+
+
+```
+
+
+
+```{r pressure, echo=FALSE}
+
+
+
+
+
+```
